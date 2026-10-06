@@ -1,0 +1,102 @@
+# =========================
+# Gradle
+# =========================
+.gradle/
+build/
+**/build/
+
+# Keep Gradle wrapper files tracked
+!gradle/wrapper/gradle-wrapper.jar
+!gradle/wrapper/gradle-wrapper.properties
+
+# =========================
+# IntelliJ IDEA / Android Studio
+# =========================
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Workspace-specific files
+.idea/workspace.xml
+.idea/tasks.xml
+.idea/usage.statistics.xml
+.idea/dictionaries/
+.idea/shelf/
+
+# Android Studio
+captures/
+.externalNativeBuild/
+.cxx/
+
+# =========================
+# Kotlin
+# =========================
+.kotlin/
+.kotlin-build/
+
+# =========================
+# macOS
+# =========================
+.DS_Store
+
+# =========================
+# Linux
+# =========================
+*~
+.directory
+
+# =========================
+# Windows
+# =========================
+Thumbs.db
+Desktop.ini
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+!.env.example
+
+# =========================
+# Local configuration
+# =========================
+local.properties
+
+# =========================
+# Generated / temporary files
+# =========================
+*.log
+*.tmp
+*.temp
+tmp/
+temp/
+
+# =========================
+# Test / Coverage
+# =========================
+coverage/
+**/reports/
+**/test-results/
+
+# =========================
+# Kotlin/Native
+# =========================
+*.kexe
+*.klib
+*.framework/
+*.xcframework/
+
+# =========================
+# Xcode (when iOS target is added)
+# =========================
+DerivedData/
+*.xcuserstate
+xcuserdata/
+*.xcworkspace/xcuserdata/
+
+# =========================
+# Compose / Android generated files
+# =========================
+.navigation/
