@@ -25,6 +25,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sudoku.core.difficulty.Difficulty
+import com.sudoku.core.haptics.Haptics
 import com.sudoku.core.storage.GameStateSnapshot
 import com.sudoku.ui.theme.SudokuColors
 
@@ -34,6 +35,7 @@ fun HomeScreen(
     onContinueGame: () -> Unit,
     onStartDaily: () -> Unit,
     onOpenStats: () -> Unit,
+    onOpenSettings: () -> Unit,
     onStartNewGame: (Difficulty) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -51,7 +53,7 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // App Header
+            // Header Bar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -67,18 +69,37 @@ fun HomeScreen(
                     )
                 }
 
-                // Stats Shortcut Button
-                Text(
-                    text = "📊 Stats",
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFFA5B4FC),
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color(0xFF1E2235))
-                        .clickable(onClick = onOpenStats)
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    // Stats Shortcut
+                    Text(
+                        text = "📊 Stats",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = Color(0xFFA5B4FC),
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E2235))
+                            .clickable {
+                                Haptics.click()
+                                onOpenStats()
+                            }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    )
+
+                    // Settings Shortcut
+                    Text(
+                        text = "⚙️",
+                        fontSize = 15.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E2235))
+                            .clickable {
+                                Haptics.click()
+                                onOpenSettings()
+                            }
+                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(28.dp))
@@ -90,7 +111,10 @@ fun HomeScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(14.dp))
                         .background(Color(0xFF1E2438))
-                        .clickable(onClick = onContinueGame)
+                        .clickable {
+                            Haptics.click()
+                            onContinueGame()
+                        }
                         .padding(18.dp)
                 ) {
                     Row(
@@ -114,7 +138,10 @@ fun HomeScreen(
                         }
 
                         Button(
-                            onClick = onContinueGame,
+                            onClick = {
+                                Haptics.click()
+                                onContinueGame()
+                            },
                             colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
                         ) {
                             Text("Resume", color = Color.White)
@@ -131,7 +158,10 @@ fun HomeScreen(
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
                     .background(Color(0xFF24223A))
-                    .clickable(onClick = onStartDaily)
+                    .clickable {
+                        Haptics.click()
+                        onStartDaily()
+                    }
                     .padding(18.dp)
             ) {
                 Row(
@@ -155,7 +185,10 @@ fun HomeScreen(
                     }
 
                     Button(
-                        onClick = onStartDaily,
+                        onClick = {
+                            Haptics.click()
+                            onStartDaily()
+                        },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9333EA))
                     ) {
                         Text("Play", color = Color.White)
@@ -193,7 +226,10 @@ fun HomeScreen(
                             .fillMaxWidth()
                             .clip(RoundedCornerShape(12.dp))
                             .background(SudokuColors.CardBackground)
-                            .clickable { onStartNewGame(diff) }
+                            .clickable {
+                                Haptics.click()
+                                onStartNewGame(diff)
+                            }
                             .padding(horizontal = 18.dp, vertical = 12.dp)
                     ) {
                         Row(

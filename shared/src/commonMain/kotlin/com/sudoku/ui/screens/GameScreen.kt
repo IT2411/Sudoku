@@ -40,9 +40,11 @@ import com.sudoku.core.difficulty.TechniqueStep
 import com.sudoku.core.game.GameStatus
 import com.sudoku.core.game.SudokuGame
 import com.sudoku.core.generator.SudokuGenerator
+import com.sudoku.core.haptics.Haptics
 import com.sudoku.core.model.CellPosition
 import com.sudoku.core.storage.GameRepository
 import com.sudoku.core.storage.GameStateSnapshot
+import com.sudoku.core.storage.SettingsRepository
 import com.sudoku.core.storage.StatisticsRepository
 import com.sudoku.ui.board.SudokuBoardView
 import com.sudoku.ui.controls.HintCard
@@ -58,12 +60,16 @@ fun GameScreen(
     modifier: Modifier = Modifier
 ) {
     val coroutineScope = rememberCoroutineScope()
+    val settings = remember { SettingsRepository.loadSettings() }
+    val maxMistakesAllowed = if (settings.mistakeLimitEnabled) 3 else -1
+
     var selectedDifficulty by remember { mutableStateOf(initialGame?.difficulty ?: Difficulty.EASY) }
     var game by remember {
         mutableStateOf(
             initialGame ?: SudokuGame(
                 puzzle = SudokuGenerator.generate(targetClues = selectedDifficulty.baseClueTarget),
-                difficulty = selectedDifficulty
+                difficulty = selectedDifficulty,
+                maxMistakes = maxMistakesAllowed
             )
         )
     }
@@ -81,6 +87,7 @@ fun GameScreen(
 
     fun triggerCompletionAnimation(cells: Set<CellPosition>) {
         if (cells.isNotEmpty()) {
+            Haptics.success()
             coroutineScope.launch {
                 animatingCells = cells
                 delay(1200L)
@@ -93,7 +100,8 @@ fun GameScreen(
         selectedDifficulty = diff
         game = SudokuGame(
             puzzle = SudokuGenerator.generate(targetClues = diff.baseClueTarget),
-            difficulty = diff
+            difficulty = diff,
+            maxMistakes = maxMistakesAllowed
         )
         StatisticsRepository.recordGameStarted(diff)
         timerSeconds = 0L
@@ -113,10 +121,13 @@ fun GameScreen(
         }
     }
 
-    // Auto-record victory statistics upon completion
     LaunchedEffect(game.status) {
         if (game.status == GameStatus.COMPLETED) {
+            Haptics.success()
             StatisticsRepository.recordGameWon(game.difficulty, timerSeconds)
+            GameRepository.clearGame()
+        } else if (game.status == GameStatus.GAME_OVER) {
+            Haptics.error()
             GameRepository.clearGame()
         }
     }
@@ -148,6 +159,7 @@ fun GameScreen(
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .clickable {
+                            Haptics.click()
                             autoSave()
                             onBackToHome()
                         }
@@ -163,7 +175,10 @@ fun GameScreen(
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF1E2235))
-                            .clickable { difficultyMenuOpen = true }
+                            .clickable {
+                                Haptics.click()
+                                difficultyMenuOpen = true
+                            }
                             .padding(horizontal = 12.dp, vertical = 6.dp)
                     )
                     DropdownMenu(
@@ -174,6 +189,7 @@ fun GameScreen(
                             DropdownMenuItem(
                                 text = { Text(diff.displayName) },
                                 onClick = {
+                                    Haptics.click()
                                     difficultyMenuOpen = false
                                     startNewGame(diff)
                                 }
@@ -182,36 +198,51 @@ fun GameScreen(
                     }
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = formatSeconds(timerSeconds),
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = SudokuColors.TextPlayer
-                    )
-                    OutlinedButton(
-                        onClick = {
-                            if (game.status == GameStatus.PLAYING) game.pause() else game.resume()
-                            autoSave()
-                            boardVersion++
-                        },
-                        contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                // Timer (Conditional based on settings)
+                if (settings.timerVisible) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Text(if (game.status == GameStatus.PAUSED) "▶" else "⏸", color = Color(0xFF94A3B8))
+                        Text(
+                            text = formatSeconds(timerSeconds),
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = SudokuColors.TextPlayer
+                        )
+                        OutlinedButton(
+                            onClick = {
+                                Haptics.click()
+                                if (game.status == GameStatus.PLAYING) game.pause() else game.resume()
+                                autoSave()
+                                boardVersion++
+                            },
+                            contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(if (game.status == GameStatus.PAUSED) "▶" else "⏸", color = Color(0xFF94A3B8))
+                        }
                     }
                 }
 
-                Text(
-                    text = "${game.mistakes}/3 ❌",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = if (game.mistakes > 0) SudokuColors.TextMistake else SudokuColors.TextNote
-                )
+                // Mistakes Display
+                if (settings.mistakeLimitEnabled) {
+                    Text(
+                        text = "${game.mistakes}/3 ❌",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (game.mistakes > 0) SudokuColors.TextMistake else SudokuColors.TextNote
+                    )
+                } else {
+                    Text(
+                        text = "Practice",
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF10B981)
+                    )
+                }
             }
 
+            // Board View
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -223,6 +254,7 @@ fun GameScreen(
                         animatingCells = animatingCells,
                         onCellSelected = { pos ->
                             if (game.status == GameStatus.PLAYING) {
+                                Haptics.click()
                                 game.selectCell(pos)
                                 boardVersion++
                             }
@@ -250,6 +282,7 @@ fun GameScreen(
                             )
                             Button(
                                 onClick = {
+                                    Haptics.click()
                                     game.resume()
                                     autoSave()
                                     boardVersion++
@@ -263,10 +296,12 @@ fun GameScreen(
                 }
             }
 
+            // Hint Card
             activeHint?.let { hint ->
                 HintCard(
                     hint = hint,
                     onApply = {
+                        Haptics.click()
                         val pos = hint.placedDigit?.first
                         game.applyHint(hint)
                         if (pos != null) {
@@ -280,12 +315,14 @@ fun GameScreen(
                 )
             }
 
+            // Actions: Undo, Redo, Hint
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 Button(
                     onClick = {
+                        Haptics.click()
                         if (game.undo()) {
                             autoSave()
                             boardVersion++
@@ -299,6 +336,7 @@ fun GameScreen(
 
                 Button(
                     onClick = {
+                        Haptics.click()
                         if (game.redo()) {
                             autoSave()
                             boardVersion++
@@ -312,6 +350,7 @@ fun GameScreen(
 
                 Button(
                     onClick = {
+                        Haptics.click()
                         activeHint = game.findNextHint()
                         boardVersion++
                     },
@@ -322,14 +361,21 @@ fun GameScreen(
                 }
             }
 
+            // Keypad
             NumberPad(
                 isNotesMode = notesMode,
                 completedDigits = game.completedDigits,
                 onDigitClicked = { digit ->
                     game.isNotesModeActive = notesMode
                     val targetPos = game.selectedCell
+                    val prevMistakes = game.mistakes
                     if (game.enterDigit(digit)) {
                         activeHint = null
+                        if (game.mistakes > prevMistakes) {
+                            Haptics.error() // Double buzz on wrong placement
+                        } else {
+                            Haptics.click() // Subtle tick on valid placement
+                        }
                         if (!notesMode && targetPos != null) {
                             triggerCompletionAnimation(game.checkNewlyCompletedUnits(targetPos))
                         }
@@ -338,10 +384,12 @@ fun GameScreen(
                     }
                 },
                 onToggleNotes = {
+                    Haptics.click()
                     notesMode = !notesMode
                     game.isNotesModeActive = notesMode
                 },
                 onErase = {
+                    Haptics.click()
                     if (game.erase()) {
                         activeHint = null
                         autoSave()
@@ -362,7 +410,6 @@ fun GameScreen(
                 onNewGame = { diff -> startNewGame(diff) }
             )
         } else if (game.status == GameStatus.GAME_OVER) {
-            GameRepository.clearGame()
             GameOverDialog(
                 onRetry = { startNewGame(selectedDifficulty) }
             )
