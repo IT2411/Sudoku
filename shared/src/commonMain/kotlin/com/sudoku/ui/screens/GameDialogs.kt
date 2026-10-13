@@ -1,0 +1,117 @@
+package com.sudoku.ui.screens
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import com.sudoku.core.difficulty.Difficulty
+import com.sudoku.ui.theme.SudokuColors
+
+@Composable
+fun CompletionDialog(
+    elapsedSeconds: Long,
+    mistakes: Int,
+    hintsUsed: Int,
+    difficulty: Difficulty,
+    onNewGame: (Difficulty) -> Unit
+) {
+    Dialog(onDismissRequest = {}) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(SudokuColors.CardBackground)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Text(text = "🎉", fontSize = 48.sp)
+            Text(
+                text = "Puzzle Solved!",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = SudokuColors.TextGiven
+            )
+            Text(
+                text = "${difficulty.displayName} • ${formatSeconds(elapsedSeconds)}",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = Color(0xFF34D399)
+            )
+
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(text = "Mistakes: $mistakes", fontSize = 14.sp, color = SudokuColors.TextNote)
+            Text(text = "Hints Used: $hintsUsed", fontSize = 14.sp, color = SudokuColors.TextNote)
+
+            Spacer(modifier = Modifier.height(12.dp))
+            Button(
+                onClick = { onNewGame(difficulty) },
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
+            ) {
+                Text("Play Again (${difficulty.displayName})", color = Color.White)
+            }
+        }
+    }
+}
+
+@Composable
+fun GameOverDialog(
+    onRetry: () -> Unit
+) {
+    Dialog(onDismissRequest = {}) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .background(SudokuColors.CardBackground)
+                .padding(24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(text = "❌", fontSize = 48.sp)
+            Text(
+                text = "Game Over",
+                fontSize = 24.sp,
+                fontWeight = FontWeight.Bold,
+                color = SudokuColors.TextMistake
+            )
+            Text(
+                text = "You reached the limit of 3 mistakes.",
+                fontSize = 14.sp,
+                color = SudokuColors.TextNote
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = onRetry,
+                modifier = Modifier.fillMaxWidth(),
+                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+            ) {
+                Text("Try Again", color = Color.White)
+            }
+        }
+    }
+}
+
+fun formatSeconds(seconds: Long): String {
+    val m = seconds / 60
+    val s = seconds % 60
+    return "${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}"
+}

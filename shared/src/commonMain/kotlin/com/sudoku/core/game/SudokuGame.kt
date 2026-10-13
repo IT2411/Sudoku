@@ -1,5 +1,9 @@
 package com.sudoku.core.game
 
+import com.sudoku.core.candidates.CandidateCalculator
+import com.sudoku.core.difficulty.Difficulty
+import com.sudoku.core.difficulty.SolvingTechnique
+import com.sudoku.core.difficulty.TechniqueStep
 import com.sudoku.core.generator.GeneratedPuzzle
 import com.sudoku.core.model.CellPosition
 import com.sudoku.core.model.Candidates
@@ -8,12 +12,12 @@ import com.sudoku.core.validator.SudokuValidator
 
 class SudokuGame(
     val puzzle: GeneratedPuzzle,
-    val maxMistakes: Int = 3 // Standard rules (set to -1 for unlimited)
+    val difficulty: Difficulty = Difficulty.MEDIUM,
+    val maxMistakes: Int = 3
 ) {
     var board: SudokuBoard = puzzle.initialBoard.copy()
         private set
 
-    // 81 elements representing pencil marks per cell
     private val notesGrid = Array(CellPosition.TOTAL_CELLS) { Candidates.NONE }
 
     val undoManager = UndoManager()
@@ -37,16 +41,74 @@ class SudokuGame(
         selectedCell = position
     }
 
-    /**
-     * Enters a number into the selected cell.
-     * If [isNotesModeActive] is true, toggles the pencil note.
-     * If false, places the digit on the board.
-     */
+    val completedDigits: Set<Int>
+        get() = buildSet {
+            for (digit in 1..9) {
+                var count = 0
+                for (i in 0 until CellPosition.TOTAL_CELLS) {
+                    val pos = CellPosition.fromIndex(i)
+                    if (board[pos] == digit && puzzle.solution[pos] == digit) {
+                        count++
+                    }
+                }
+                if (count == 9) add(digit)
+            }
+        }
+
+    fun checkNewlyCompletedUnits(pos: CellPosition): Set<CellPosition> {
+        val animatingCells = mutableSetOf<CellPosition>()
+
+        var rowComplete = true
+        for (c in 0..8) {
+            val p = CellPosition.of(pos.row, c)
+            if (board[p] != puzzle.solution[p]) {
+                rowComplete = false
+                break
+            }
+        }
+        if (rowComplete) {
+            for (c in 0..8) animatingCells.add(CellPosition.of(pos.row, c))
+        }
+
+        var colComplete = true
+        for (r in 0..8) {
+            val p = CellPosition.of(r, pos.column)
+            if (board[p] != puzzle.solution[p]) {
+                colComplete = false
+                break
+            }
+        }
+        if (colComplete) {
+            for (r in 0..8) animatingCells.add(CellPosition.of(r, pos.column))
+        }
+
+        var boxComplete = true
+        val startR = (pos.row / 3) * 3
+        val startC = (pos.column / 3) * 3
+        for (r in 0..2) {
+            for (c in 0..2) {
+                val p = CellPosition.of(startR + r, startC + c)
+                if (board[p] != puzzle.solution[p]) {
+                    boxComplete = false
+                    break
+                }
+            }
+        }
+        if (boxComplete) {
+            for (r in 0..2) {
+                for (c in 0..2) animatingCells.add(CellPosition.of(startR + r, startC + c))
+            }
+        }
+
+        return animatingCells
+    }
+
     fun enterDigit(digit: Int): Boolean {
         require(digit in 1..9) { "Digit must be 1..9, got $digit" }
         val pos = selectedCell ?: return false
         if (status != GameStatus.PLAYING) return false
-        if (puzzle.givenPositions.contains(pos)) return false // Clues are immutable
+        if (puzzle.givenPositions.contains(pos)) return false
+        if (completedDigits.contains(digit)) return false
 
         return if (isNotesModeActive) {
             toggleNote(pos, digit)
@@ -56,7 +118,6 @@ class SudokuGame(
     }
 
     private fun toggleNote(pos: CellPosition, digit: Int): Boolean {
-        // Can only add notes to empty cells
         if (board[pos] != SudokuBoard.EMPTY_VALUE) return false
 
         val oldNotes = notesGrid[pos.index]
@@ -77,7 +138,7 @@ class SudokuGame(
 
     private fun placeDigit(pos: CellPosition, digit: Int): Boolean {
         val prevVal = board[pos]
-        if (prevVal == digit) return false // No-op
+        if (prevVal == digit) return false
 
         val isMistake = puzzle.solution[pos] != digit
         if (isMistake) {
@@ -90,11 +151,9 @@ class SudokuGame(
         val oldNotes = notesGrid[pos.index]
         val secondaryEliminations = mutableMapOf<CellPosition, Candidates>()
 
-        // Update board
         board = board.withCell(pos, digit)
-        notesGrid[pos.index] = Candidates.NONE // Clear own notes on digit placement
+        notesGrid[pos.index] = Candidates.NONE
 
-        // Auto-clear matching note in peer cells (row, col, box)
         for (idx in 0 until CellPosition.TOTAL_CELLS) {
             val peerPos = CellPosition.fromIndex(idx)
             if (peerPos != pos && (peerPos.row == pos.row || peerPos.column == pos.column || peerPos.box == pos.box)) {
@@ -122,9 +181,6 @@ class SudokuGame(
         return true
     }
 
-    /**
-     * Erases either placed value or notes in the selected cell.
-     */
     fun erase(): Boolean {
         val pos = selectedCell ?: return false
         if (status != GameStatus.PLAYING) return false
@@ -132,7 +188,6 @@ class SudokuGame(
 
         val prevVal = board[pos]
         val prevNotes = notesGrid[pos.index]
-
         if (prevVal == SudokuBoard.EMPTY_VALUE && prevNotes.isEmpty) return false
 
         board = board.withCell(pos, SudokuBoard.EMPTY_VALUE)
@@ -154,19 +209,15 @@ class SudokuGame(
         if (status != GameStatus.PLAYING) return false
         val move = undoManager.undo() ?: return false
 
-        // Revert cell value and notes
         board = board.withCell(move.position, move.previousValue)
         notesGrid[move.position.index] = move.previousCellNotes
 
-        // Restore any eliminated notes in peer cells
         for ((peerPos, restored) in move.secondaryNotesEliminated) {
             val cur = notesGrid[peerPos.index]
             notesGrid[peerPos.index] = cur union restored
         }
 
-        if (move.wasMistake && mistakes > 0) {
-            mistakes--
-        }
+        if (move.wasMistake && mistakes > 0) mistakes--
 
         selectedCell = move.position
         return true
@@ -184,17 +235,45 @@ class SudokuGame(
             notesGrid[peerPos.index] = Candidates.fromMask(cur.mask and eliminated.mask.inv())
         }
 
-        if (move.wasMistake) {
-            mistakes++
-        }
+        if (move.wasMistake) mistakes++
 
         selectedCell = move.position
         checkVictory()
         return true
     }
 
-    fun incrementHint() {
+    fun findNextHint(): TechniqueStep? {
+        val currentCandidates = CandidateCalculator.calculateAllCandidates(board)
+        val techniques = listOf(
+            SolvingTechnique.NakedSingle,
+            SolvingTechnique.HiddenSingle,
+            SolvingTechnique.NakedPair,
+            SolvingTechnique.PointingPair,
+            SolvingTechnique.XWing
+        )
+
+        for (tech in techniques) {
+            val step = tech.findStep(board, currentCandidates)
+            if (step != null) return step
+        }
+        return null
+    }
+
+    fun applyHint(step: TechniqueStep): Boolean {
         hintsUsed++
+        if (step.placedDigit != null) {
+            val (pos, digit) = step.placedDigit
+            selectCell(pos)
+            isNotesModeActive = false
+            return placeDigit(pos, digit)
+        } else if (step.eliminatedCandidates.isNotEmpty()) {
+            for ((pos, elim) in step.eliminatedCandidates) {
+                val cur = notesGrid[pos.index]
+                notesGrid[pos.index] = Candidates.fromMask(cur.mask and elim.mask.inv())
+            }
+            return true
+        }
+        return false
     }
 
     fun pause() {

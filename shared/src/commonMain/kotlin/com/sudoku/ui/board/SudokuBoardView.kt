@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
+import com.sudoku.core.difficulty.TechniqueStep
 import com.sudoku.core.game.SudokuGame
 import com.sudoku.core.interaction.BoardSelectionEngine
 import com.sudoku.core.model.CellPosition
@@ -22,12 +23,15 @@ import com.sudoku.ui.theme.SudokuColors
 fun SudokuBoardView(
     game: SudokuGame,
     onCellSelected: (CellPosition) -> Unit,
+    activeHint: TechniqueStep? = null,
+    animatingCells: Set<CellPosition> = emptySet(),
     modifier: Modifier = Modifier
 ) {
     val highlights = BoardSelectionEngine.computeHighlights(
         board = game.board,
         notes = { game.getNotes(it) },
-        selectedCell = game.selectedCell
+        selectedCell = game.selectedCell,
+        activeHint = activeHint
     )
 
     val activeDigit = game.selectedCell?.let { pos ->
@@ -39,9 +43,8 @@ fun SudokuBoardView(
         modifier = modifier
             .fillMaxWidth()
             .aspectRatio(1f)
-            .clip(RoundedCornerShape(4.dp))
+            .clip(RoundedCornerShape(8.dp))
     ) {
-        // 1. Grid Cells
         Column(modifier = Modifier.fillMaxSize()) {
             for (r in 0 until CellPosition.GRID_SIZE) {
                 Row(
@@ -52,10 +55,12 @@ fun SudokuBoardView(
                     for (c in 0 until CellPosition.GRID_SIZE) {
                         val pos = CellPosition.of(r, c)
                         SudokuCellView(
+                            position = pos,
                             value = game.board[pos],
                             notes = game.getNotes(pos),
                             isGiven = game.puzzle.givenPositions.contains(pos),
                             highlight = highlights[pos.index],
+                            isAnimatingUnitCompletion = animatingCells.contains(pos),
                             activeHighlightDigit = activeDigit,
                             onClick = { onCellSelected(pos) },
                             modifier = Modifier.weight(1f)
@@ -65,17 +70,15 @@ fun SudokuBoardView(
             }
         }
 
-        // 2. High-performance Canvas Divider Overlay
         Canvas(modifier = Modifier.fillMaxSize()) {
             val cellWidth = size.width / CellPosition.GRID_SIZE
             val cellHeight = size.height / CellPosition.GRID_SIZE
 
             for (i in 1 until CellPosition.GRID_SIZE) {
                 val isThick = i % CellPosition.BOX_SIZE == 0
-                val strokeWidth = if (isThick) 2.5.dp.toPx() else 1.dp.toPx()
+                val strokeWidth = if (isThick) 2.dp.toPx() else 0.75.dp.toPx()
                 val color = if (isThick) SudokuColors.ThickBorder else SudokuColors.ThinBorder
 
-                // Vertical grid lines
                 drawLine(
                     color = color,
                     start = Offset(x = i * cellWidth, y = 0f),
@@ -83,7 +86,6 @@ fun SudokuBoardView(
                     strokeWidth = strokeWidth
                 )
 
-                // Horizontal grid lines
                 drawLine(
                     color = color,
                     start = Offset(x = 0f, y = i * cellHeight),
@@ -92,11 +94,10 @@ fun SudokuBoardView(
                 )
             }
 
-            // Outer border
             drawRect(
                 color = SudokuColors.ThickBorder,
                 size = size,
-                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3.dp.toPx())
+                style = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.5.dp.toPx())
             )
         }
     }

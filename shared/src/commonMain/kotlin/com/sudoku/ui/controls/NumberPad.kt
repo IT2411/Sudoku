@@ -24,6 +24,7 @@ import com.sudoku.ui.theme.SudokuColors
 @Composable
 fun NumberPad(
     isNotesMode: Boolean,
+    completedDigits: Set<Int>,
     onDigitClicked: (Int) -> Unit,
     onToggleNotes: () -> Unit,
     onErase: () -> Unit,
@@ -33,14 +34,15 @@ fun NumberPad(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // Digits 1 to 9 (Two rows: 1..5 and 6..9)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             for (d in 1..5) {
+                val isCompleted = completedDigits.contains(d)
                 PadButton(
                     text = d.toString(),
+                    enabled = !isCompleted,
                     onClick = { onDigitClicked(d) },
                     modifier = Modifier.weight(1f)
                 )
@@ -52,41 +54,42 @@ fun NumberPad(
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             for (d in 6..9) {
+                val isCompleted = completedDigits.contains(d)
                 PadButton(
                     text = d.toString(),
+                    enabled = !isCompleted,
                     onClick = { onDigitClicked(d) },
                     modifier = Modifier.weight(1f)
                 )
             }
 
-            // Erase Button
             PadButton(
                 text = "⌫",
+                enabled = true,
                 onClick = onErase,
-                bgColor = Color(0xFFFFEBEE),
+                bgColor = Color(0xFF2A1E24),
                 textColor = SudokuColors.TextMistake,
                 modifier = Modifier.weight(1f)
             )
         }
 
-        // Action Toolbar: Notes Mode Toggle
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 4.dp),
+                .padding(top = 2.dp),
             horizontalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(20.dp))
-                    .background(if (isNotesMode) Color(0xFF1976D2) else Color(0xFFE0E0E0))
+                    .background(if (isNotesMode) Color(0xFF2563EB) else SudokuColors.PadButtonBg)
                     .clickable(onClick = onToggleNotes)
-                    .padding(horizontal = 24.dp, vertical = 10.dp),
+                    .padding(horizontal = 28.dp, vertical = 9.dp),
                 contentAlignment = Alignment.Center
             ) {
                 Text(
                     text = if (isNotesMode) "✏️ Notes: ON" else "✏️ Notes: OFF",
-                    color = if (isNotesMode) Color.White else Color.Black,
+                    color = if (isNotesMode) Color.White else Color(0xFF94A3B8),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 14.sp
                 )
@@ -98,24 +101,28 @@ fun NumberPad(
 @Composable
 private fun PadButton(
     text: String,
+    enabled: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    bgColor: Color = Color(0xFFE3F2FD),
-    textColor: Color = SudokuColors.TextPlayer
+    bgColor: Color = SudokuColors.PadButtonBg,
+    textColor: Color = SudokuColors.PadButtonText
 ) {
+    val finalBg = if (enabled) bgColor else SudokuColors.PadButtonDisabledBg
+    val finalText = if (enabled) textColor else SudokuColors.PadButtonDisabledText
+
     Box(
         modifier = modifier
             .height(52.dp)
-            .clip(RoundedCornerShape(8.dp))
-            .background(bgColor)
-            .clickable(onClick = onClick),
+            .clip(RoundedCornerShape(10.dp))
+            .background(finalBg)
+            .clickable(enabled = enabled, onClick = onClick),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = text,
             fontSize = 20.sp,
             fontWeight = FontWeight.Bold,
-            color = textColor
+            color = finalText
         )
     }
 }

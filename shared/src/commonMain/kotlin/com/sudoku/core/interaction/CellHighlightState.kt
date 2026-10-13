@@ -1,14 +1,13 @@
 package com.sudoku.core.interaction
 
-/**
- * Visual styling flags for a single cell on the Sudoku board.
- */
 data class CellHighlightState(
     val isSelected: Boolean = false,
-    val isPeer: Boolean = false,             // Shares row, column, or box with selected cell
-    val isSameDigit: Boolean = false,        // Has identical placed digit to selected
-    val hasMatchingNote: Boolean = false,    // Is empty, but has note matching selected digit
-    val hasConflict: Boolean = false         // Involved in a duplicate rule violation
+    val isPeer: Boolean = false,
+    val isSameDigit: Boolean = false,
+    val hasMatchingNote: Boolean = false,
+    val hasConflict: Boolean = false,
+    val isHintPrimary: Boolean = false,    // Core cell targeted by the hint
+    val isHintSecondary: Boolean = false   // Affected peer/elimination cells
 ) {
     companion object {
         val DEFAULT = CellHighlightState()
