@@ -9,9 +9,11 @@ import com.sudoku.core.daily.DailyPuzzleEngine
 import com.sudoku.core.difficulty.Difficulty
 import com.sudoku.core.game.SudokuGame
 import com.sudoku.core.generator.SudokuGenerator
+import com.sudoku.core.storage.AchievementRepository
 import com.sudoku.core.storage.GameRepository
 import com.sudoku.core.storage.SettingsRepository
 import com.sudoku.core.storage.StatisticsRepository
+import com.sudoku.ui.screens.AchievementsScreen
 import com.sudoku.ui.screens.GameScreen
 import com.sudoku.ui.screens.HomeScreen
 import com.sudoku.ui.screens.SettingsScreen
@@ -20,6 +22,7 @@ import com.sudoku.ui.screens.StatisticsScreen
 sealed interface AppScreen {
     data object Home : AppScreen
     data object Statistics : AppScreen
+    data object Badges : AppScreen
     data object Settings : AppScreen
     data class Game(val activeGame: SudokuGame) : AppScreen
 }
@@ -47,6 +50,9 @@ fun SudokuApp() {
                 onOpenStats = {
                     currentScreen = AppScreen.Statistics
                 },
+                onOpenBadges = {
+                    currentScreen = AppScreen.Badges
+                },
                 onOpenSettings = {
                     currentScreen = AppScreen.Settings
                 },
@@ -63,6 +69,12 @@ fun SudokuApp() {
         is AppScreen.Statistics -> {
             StatisticsScreen(
                 stats = StatisticsRepository.loadStats(),
+                onBack = { currentScreen = AppScreen.Home }
+            )
+        }
+        is AppScreen.Badges -> {
+            AchievementsScreen(
+                unlocked = AchievementRepository.getUnlockedAchievements(),
                 onBack = { currentScreen = AppScreen.Home }
             )
         }

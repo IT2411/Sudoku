@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.sudoku.core.achievements.Achievement
 import com.sudoku.core.difficulty.Difficulty
 import com.sudoku.ui.theme.SudokuColors
 
@@ -29,6 +30,7 @@ fun CompletionDialog(
     mistakes: Int,
     hintsUsed: Int,
     difficulty: Difficulty,
+    newAchievements: List<Achievement> = emptyList(),
     onNewGame: (Difficulty) -> Unit
 ) {
     Dialog(onDismissRequest = {}) {
@@ -54,6 +56,28 @@ fun CompletionDialog(
                 fontWeight = FontWeight.SemiBold,
                 color = Color(0xFF34D399)
             )
+
+            // Newly Unlocked Achievements Badge Banner
+            if (newAchievements.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color(0xFF2A2438))
+                        .padding(10.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(text = "🏆 Unlocked Badges!", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFFFBBF24))
+                    newAchievements.forEach { ach ->
+                        Text(
+                            text = "${ach.icon} ${ach.title}",
+                            fontSize = 12.sp,
+                            color = Color.White
+                        )
+                    }
+                }
+            }
 
             Spacer(modifier = Modifier.height(4.dp))
             Text(text = "Mistakes: $mistakes", fontSize = 14.sp, color = SudokuColors.TextNote)

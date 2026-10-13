@@ -35,6 +35,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sudoku.core.achievements.Achievement
 import com.sudoku.core.difficulty.Difficulty
 import com.sudoku.core.difficulty.TechniqueStep
 import com.sudoku.core.game.GameStatus
@@ -42,6 +43,7 @@ import com.sudoku.core.game.SudokuGame
 import com.sudoku.core.generator.SudokuGenerator
 import com.sudoku.core.haptics.Haptics
 import com.sudoku.core.model.CellPosition
+import com.sudoku.core.storage.AchievementRepository
 import com.sudoku.core.storage.GameRepository
 import com.sudoku.core.storage.GameStateSnapshot
 import com.sudoku.core.storage.SettingsRepository
@@ -80,6 +82,7 @@ fun GameScreen(
     var activeHint by remember { mutableStateOf<TechniqueStep?>(null) }
     var difficultyMenuOpen by remember { mutableStateOf(false) }
     var animatingCells by remember { mutableStateOf<Set<CellPosition>>(emptySet()) }
+    var newlyUnlockedAchievements by remember { mutableStateOf<List<Achievement>>(emptyList()) }
 
     fun autoSave() {
         GameRepository.saveGame(GameStateSnapshot.fromGame(game))
@@ -108,6 +111,7 @@ fun GameScreen(
         activeHint = null
         notesMode = false
         animatingCells = emptySet()
+        newlyUnlockedAchievements = emptyList()
         autoSave()
         boardVersion++
     }
@@ -125,6 +129,8 @@ fun GameScreen(
         if (game.status == GameStatus.COMPLETED) {
             Haptics.success()
             StatisticsRepository.recordGameWon(game.difficulty, timerSeconds)
+            // Evaluate achievements
+            newlyUnlockedAchievements = AchievementRepository.evaluateGameWon(game, timerSeconds)
             GameRepository.clearGame()
         } else if (game.status == GameStatus.GAME_OVER) {
             Haptics.error()
@@ -198,7 +204,6 @@ fun GameScreen(
                     }
                 }
 
-                // Timer (Conditional based on settings)
                 if (settings.timerVisible) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -224,7 +229,6 @@ fun GameScreen(
                     }
                 }
 
-                // Mistakes Display
                 if (settings.mistakeLimitEnabled) {
                     Text(
                         text = "${game.mistakes}/3 ❌",
@@ -242,7 +246,6 @@ fun GameScreen(
                 }
             }
 
-            // Board View
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -296,7 +299,6 @@ fun GameScreen(
                 }
             }
 
-            // Hint Card
             activeHint?.let { hint ->
                 HintCard(
                     hint = hint,
@@ -315,7 +317,6 @@ fun GameScreen(
                 )
             }
 
-            // Actions: Undo, Redo, Hint
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -361,7 +362,6 @@ fun GameScreen(
                 }
             }
 
-            // Keypad
             NumberPad(
                 isNotesMode = notesMode,
                 completedDigits = game.completedDigits,
@@ -372,9 +372,9 @@ fun GameScreen(
                     if (game.enterDigit(digit)) {
                         activeHint = null
                         if (game.mistakes > prevMistakes) {
-                            Haptics.error() // Double buzz on wrong placement
+                            Haptics.error()
                         } else {
-                            Haptics.click() // Subtle tick on valid placement
+                            Haptics.click()
                         }
                         if (!notesMode && targetPos != null) {
                             triggerCompletionAnimation(game.checkNewlyCompletedUnits(targetPos))
@@ -407,6 +407,7 @@ fun GameScreen(
                 mistakes = game.mistakes,
                 hintsUsed = game.hintsUsed,
                 difficulty = selectedDifficulty,
+                newAchievements = newlyUnlockedAchievements,
                 onNewGame = { diff -> startNewGame(diff) }
             )
         } else if (game.status == GameStatus.GAME_OVER) {

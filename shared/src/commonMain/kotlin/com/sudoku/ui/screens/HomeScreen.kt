@@ -35,6 +35,7 @@ fun HomeScreen(
     onContinueGame: () -> Unit,
     onStartDaily: () -> Unit,
     onOpenStats: () -> Unit,
+    onOpenBadges: () -> Unit,
     onOpenSettings: () -> Unit,
     onStartNewGame: (Difficulty) -> Unit,
     modifier: Modifier = Modifier
@@ -69,13 +70,25 @@ fun HomeScreen(
                     )
                 }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    // Stats Shortcut
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    // Badges Button
                     Text(
-                        text = "📊 Stats",
-                        fontSize = 13.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = Color(0xFFA5B4FC),
+                        text = "🏆",
+                        fontSize = 15.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E2235))
+                            .clickable {
+                                Haptics.click()
+                                onOpenBadges()
+                            }
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                    )
+
+                    // Stats Button
+                    Text(
+                        text = "📊",
+                        fontSize = 15.sp,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color(0xFF1E2235))
@@ -83,10 +96,10 @@ fun HomeScreen(
                                 Haptics.click()
                                 onOpenStats()
                             }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
                     )
 
-                    // Settings Shortcut
+                    // Settings Button
                     Text(
                         text = "⚙️",
                         fontSize = 15.sp,
@@ -97,7 +110,7 @@ fun HomeScreen(
                                 Haptics.click()
                                 onOpenSettings()
                             }
-                            .padding(horizontal = 8.dp, vertical = 5.dp)
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
                     )
                 }
             }
