@@ -1,5 +1,6 @@
 rootProject.name = "sudoku-engine"
 include(":shared")
+include(":androidApp")
 
 pluginManagement {
     repositories {
