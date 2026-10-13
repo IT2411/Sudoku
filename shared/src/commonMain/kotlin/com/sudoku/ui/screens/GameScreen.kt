@@ -41,6 +41,8 @@ import com.sudoku.core.game.GameStatus
 import com.sudoku.core.game.SudokuGame
 import com.sudoku.core.generator.SudokuGenerator
 import com.sudoku.core.model.CellPosition
+import com.sudoku.core.storage.GameRepository
+import com.sudoku.core.storage.GameStateSnapshot
 import com.sudoku.ui.board.SudokuBoardView
 import com.sudoku.ui.controls.HintCard
 import com.sudoku.ui.controls.NumberPad
@@ -49,12 +51,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Composable
-fun GameScreen(modifier: Modifier = Modifier) {
+fun GameScreen(
+    initialGame: SudokuGame? = null,
+    onBackToHome: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
     val coroutineScope = rememberCoroutineScope()
-    var selectedDifficulty by remember { mutableStateOf(Difficulty.EASY) }
+    var selectedDifficulty by remember { mutableStateOf(initialGame?.difficulty ?: Difficulty.EASY) }
     var game by remember {
         mutableStateOf(
-            SudokuGame(
+            initialGame ?: SudokuGame(
                 puzzle = SudokuGenerator.generate(targetClues = selectedDifficulty.baseClueTarget),
                 difficulty = selectedDifficulty
             )
@@ -63,16 +69,19 @@ fun GameScreen(modifier: Modifier = Modifier) {
 
     var boardVersion by remember { mutableIntStateOf(0) }
     var notesMode by remember { mutableStateOf(false) }
-    var timerSeconds by remember { mutableLongStateOf(0L) }
+    var timerSeconds by remember { mutableLongStateOf(game.elapsedTimeSeconds) }
     var activeHint by remember { mutableStateOf<TechniqueStep?>(null) }
     var difficultyMenuOpen by remember { mutableStateOf(false) }
     var animatingCells by remember { mutableStateOf<Set<CellPosition>>(emptySet()) }
+
+    fun autoSave() {
+        GameRepository.saveGame(GameStateSnapshot.fromGame(game))
+    }
 
     fun triggerCompletionAnimation(cells: Set<CellPosition>) {
         if (cells.isNotEmpty()) {
             coroutineScope.launch {
                 animatingCells = cells
-                // Allow the 55ms-staggered wave to reach column 8 and smoothly fade
                 delay(1200L)
                 animatingCells = emptySet()
             }
@@ -89,6 +98,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
         activeHint = null
         notesMode = false
         animatingCells = emptySet()
+        autoSave()
         boardVersion++
     }
 
@@ -97,6 +107,8 @@ fun GameScreen(modifier: Modifier = Modifier) {
             delay(1000L)
             timerSeconds++
             game.elapsedTimeSeconds = timerSeconds
+            // Periodic snapshot every 10 seconds
+            if (timerSeconds % 10 == 0L) autoSave()
         }
     }
 
@@ -114,6 +126,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // Header Bar with Home Navigation
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -121,6 +134,20 @@ fun GameScreen(modifier: Modifier = Modifier) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Back to Home Button
+                Text(
+                    text = "🏠",
+                    fontSize = 20.sp,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable {
+                            autoSave()
+                            onBackToHome()
+                        }
+                        .padding(6.dp)
+                )
+
+                // Difficulty Pill
                 Box {
                     Text(
                         text = "${selectedDifficulty.displayName} ▼",
@@ -149,6 +176,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
                     }
                 }
 
+                // Timer & Pause
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -162,6 +190,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
                     OutlinedButton(
                         onClick = {
                             if (game.status == GameStatus.PLAYING) game.pause() else game.resume()
+                            autoSave()
                             boardVersion++
                         },
                         contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 8.dp, vertical = 2.dp)
@@ -170,14 +199,16 @@ fun GameScreen(modifier: Modifier = Modifier) {
                     }
                 }
 
+                // Mistakes Pill
                 Text(
-                    text = "Mistakes: ${game.mistakes}/3",
+                    text = "${game.mistakes}/3 ❌",
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
                     color = if (game.mistakes > 0) SudokuColors.TextMistake else SudokuColors.TextNote
                 )
             }
 
+            // Board View
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -217,6 +248,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
                             Button(
                                 onClick = {
                                     game.resume()
+                                    autoSave()
                                     boardVersion++
                                 },
                                 colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
@@ -228,6 +260,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
                 }
             }
 
+            // Hint Card
             activeHint?.let { hint ->
                 HintCard(
                     hint = hint,
@@ -238,18 +271,25 @@ fun GameScreen(modifier: Modifier = Modifier) {
                             triggerCompletionAnimation(game.checkNewlyCompletedUnits(pos))
                         }
                         activeHint = null
+                        autoSave()
                         boardVersion++
                     },
                     onDismiss = { activeHint = null }
                 )
             }
 
+            // Action Toolbar (Undo, Redo, Hint)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
             ) {
                 Button(
-                    onClick = { if (game.undo()) boardVersion++ },
+                    onClick = {
+                        if (game.undo()) {
+                            autoSave()
+                            boardVersion++
+                        }
+                    },
                     enabled = game.undoManager.canUndo && game.status == GameStatus.PLAYING,
                     colors = ButtonDefaults.buttonColors(containerColor = SudokuColors.PadButtonBg, contentColor = Color(0xFFCBD5E1))
                 ) {
@@ -257,7 +297,12 @@ fun GameScreen(modifier: Modifier = Modifier) {
                 }
 
                 Button(
-                    onClick = { if (game.redo()) boardVersion++ },
+                    onClick = {
+                        if (game.redo()) {
+                            autoSave()
+                            boardVersion++
+                        }
+                    },
                     enabled = game.undoManager.canRedo && game.status == GameStatus.PLAYING,
                     colors = ButtonDefaults.buttonColors(containerColor = SudokuColors.PadButtonBg, contentColor = Color(0xFFCBD5E1))
                 ) {
@@ -276,6 +321,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
                 }
             }
 
+            // NumberPad with Exhausted Number Disabling
             NumberPad(
                 isNotesMode = notesMode,
                 completedDigits = game.completedDigits,
@@ -287,6 +333,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
                         if (!notesMode && targetPos != null) {
                             triggerCompletionAnimation(game.checkNewlyCompletedUnits(targetPos))
                         }
+                        autoSave()
                         boardVersion++
                     }
                 },
@@ -297,6 +344,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
                 onErase = {
                     if (game.erase()) {
                         activeHint = null
+                        autoSave()
                         boardVersion++
                     }
                 }
@@ -305,7 +353,9 @@ fun GameScreen(modifier: Modifier = Modifier) {
             Spacer(modifier = Modifier.height(4.dp))
         }
 
+        // Modals
         if (game.status == GameStatus.COMPLETED) {
+            GameRepository.clearGame()
             CompletionDialog(
                 elapsedSeconds = timerSeconds,
                 mistakes = game.mistakes,
@@ -314,6 +364,7 @@ fun GameScreen(modifier: Modifier = Modifier) {
                 onNewGame = { diff -> startNewGame(diff) }
             )
         } else if (game.status == GameStatus.GAME_OVER) {
+            GameRepository.clearGame()
             GameOverDialog(
                 onRetry = { startNewGame(selectedDifficulty) }
             )
