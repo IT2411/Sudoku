@@ -32,6 +32,8 @@ import com.sudoku.ui.theme.SudokuColors
 fun HomeScreen(
     savedSnapshot: GameStateSnapshot?,
     onContinueGame: () -> Unit,
+    onStartDaily: () -> Unit,
+    onOpenStats: () -> Unit,
     onStartNewGame: (Difficulty) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -49,32 +51,47 @@ fun HomeScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
-            // App Title & Logo Icon
-            Text(text = "🔢", fontSize = 56.sp)
-            Spacer(modifier = Modifier.height(10.dp))
-            Text(
-                text = "Sudoku",
-                fontSize = 34.sp,
-                fontWeight = FontWeight.Bold,
-                color = SudokuColors.TextGiven
-            )
-            Text(
-                text = "Clean • Logic • Offline",
-                fontSize = 14.sp,
-                color = SudokuColors.TextNote
-            )
+            // App Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(text = "🔢", fontSize = 28.sp)
+                    Text(
+                        text = "Sudoku",
+                        fontSize = 28.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SudokuColors.TextGiven
+                    )
+                }
 
-            Spacer(modifier = Modifier.height(36.dp))
+                // Stats Shortcut Button
+                Text(
+                    text = "📊 Stats",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFFA5B4FC),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF1E2235))
+                        .clickable(onClick = onOpenStats)
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+            }
 
-            // Continue Game Card (if in-progress game exists)
+            Spacer(modifier = Modifier.height(28.dp))
+
+            // Continue Game Card
             if (savedSnapshot != null) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(16.dp))
+                        .clip(RoundedCornerShape(14.dp))
                         .background(Color(0xFF1E2438))
                         .clickable(onClick = onContinueGame)
-                        .padding(20.dp)
+                        .padding(18.dp)
                 ) {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -84,14 +101,14 @@ fun HomeScreen(
                         Column {
                             Text(
                                 text = "▶ Continue Game",
-                                fontSize = 18.sp,
+                                fontSize = 16.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = Color(0xFF60A5FA)
                             )
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = "${savedSnapshot.difficulty} • ${formatSeconds(savedSnapshot.elapsedSeconds)}",
-                                fontSize = 13.sp,
+                                fontSize = 12.sp,
                                 color = Color(0xFF94A3B8)
                             )
                         }
@@ -105,24 +122,63 @@ fun HomeScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(28.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
 
-            // New Game Section
+            // Daily Challenge Card
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFF24223A))
+                    .clickable(onClick = onStartDaily)
+                    .padding(18.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = "📅 Daily Challenge",
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFFC084FC)
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = "Worldwide seed for today",
+                            fontSize = 12.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                    }
+
+                    Button(
+                        onClick = onStartDaily,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9333EA))
+                    ) {
+                        Text("Play", color = Color.White)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // Standard New Game
             Text(
                 text = "START NEW GAME",
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
                 color = Color(0xFF64748B),
-                letterSpacing = 1.5.sp,
+                letterSpacing = 1.2.sp,
                 modifier = Modifier.align(Alignment.Start)
             )
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(10.dp))
 
-            // Difficulty Selection Buttons
             Column(
                 modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Difficulty.entries.forEach { diff ->
                     val color = when (diff) {
@@ -138,7 +194,7 @@ fun HomeScreen(
                             .clip(RoundedCornerShape(12.dp))
                             .background(SudokuColors.CardBackground)
                             .clickable { onStartNewGame(diff) }
-                            .padding(horizontal = 20.dp, vertical = 14.dp)
+                            .padding(horizontal = 18.dp, vertical = 12.dp)
                     ) {
                         Row(
                             modifier = Modifier.fillMaxWidth(),
@@ -147,15 +203,11 @@ fun HomeScreen(
                         ) {
                             Text(
                                 text = diff.displayName,
-                                fontSize = 16.sp,
+                                fontSize = 15.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = SudokuColors.TextGiven
                             )
-                            Text(
-                                text = "●",
-                                fontSize = 16.sp,
-                                color = color
-                            )
+                            Text("●", fontSize = 16.sp, color = color)
                         }
                     }
                 }

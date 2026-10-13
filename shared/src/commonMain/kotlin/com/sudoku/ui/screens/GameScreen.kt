@@ -43,6 +43,7 @@ import com.sudoku.core.generator.SudokuGenerator
 import com.sudoku.core.model.CellPosition
 import com.sudoku.core.storage.GameRepository
 import com.sudoku.core.storage.GameStateSnapshot
+import com.sudoku.core.storage.StatisticsRepository
 import com.sudoku.ui.board.SudokuBoardView
 import com.sudoku.ui.controls.HintCard
 import com.sudoku.ui.controls.NumberPad
@@ -94,6 +95,7 @@ fun GameScreen(
             puzzle = SudokuGenerator.generate(targetClues = diff.baseClueTarget),
             difficulty = diff
         )
+        StatisticsRepository.recordGameStarted(diff)
         timerSeconds = 0L
         activeHint = null
         notesMode = false
@@ -107,8 +109,15 @@ fun GameScreen(
             delay(1000L)
             timerSeconds++
             game.elapsedTimeSeconds = timerSeconds
-            // Periodic snapshot every 10 seconds
             if (timerSeconds % 10 == 0L) autoSave()
+        }
+    }
+
+    // Auto-record victory statistics upon completion
+    LaunchedEffect(game.status) {
+        if (game.status == GameStatus.COMPLETED) {
+            StatisticsRepository.recordGameWon(game.difficulty, timerSeconds)
+            GameRepository.clearGame()
         }
     }
 
@@ -126,7 +135,6 @@ fun GameScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header Bar with Home Navigation
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -134,7 +142,6 @@ fun GameScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Back to Home Button
                 Text(
                     text = "🏠",
                     fontSize = 20.sp,
@@ -147,7 +154,6 @@ fun GameScreen(
                         .padding(6.dp)
                 )
 
-                // Difficulty Pill
                 Box {
                     Text(
                         text = "${selectedDifficulty.displayName} ▼",
@@ -176,7 +182,6 @@ fun GameScreen(
                     }
                 }
 
-                // Timer & Pause
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -199,7 +204,6 @@ fun GameScreen(
                     }
                 }
 
-                // Mistakes Pill
                 Text(
                     text = "${game.mistakes}/3 ❌",
                     fontSize = 13.sp,
@@ -208,7 +212,6 @@ fun GameScreen(
                 )
             }
 
-            // Board View
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -260,7 +263,6 @@ fun GameScreen(
                 }
             }
 
-            // Hint Card
             activeHint?.let { hint ->
                 HintCard(
                     hint = hint,
@@ -278,7 +280,6 @@ fun GameScreen(
                 )
             }
 
-            // Action Toolbar (Undo, Redo, Hint)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -321,7 +322,6 @@ fun GameScreen(
                 }
             }
 
-            // NumberPad with Exhausted Number Disabling
             NumberPad(
                 isNotesMode = notesMode,
                 completedDigits = game.completedDigits,
@@ -353,9 +353,7 @@ fun GameScreen(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
-        // Modals
         if (game.status == GameStatus.COMPLETED) {
-            GameRepository.clearGame()
             CompletionDialog(
                 elapsedSeconds = timerSeconds,
                 mistakes = game.mistakes,
