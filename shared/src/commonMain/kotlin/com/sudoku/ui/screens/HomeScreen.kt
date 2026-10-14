@@ -15,8 +15,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -24,6 +29,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import com.sudoku.core.difficulty.Difficulty
 import com.sudoku.core.haptics.Haptics
 import com.sudoku.core.storage.GameStateSnapshot
@@ -40,6 +46,26 @@ fun HomeScreen(
     onStartNewGame: (Difficulty) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    // Tracks pending game start if confirmation is needed
+    var pendingDifficulty by remember { mutableStateOf<Difficulty?>(null) }
+    var pendingDailyStart by remember { mutableStateOf(false) }
+
+    fun requestStartGame(diff: Difficulty) {
+        if (savedSnapshot != null) {
+            pendingDifficulty = diff
+        } else {
+            onStartNewGame(diff)
+        }
+    }
+
+    fun requestStartDaily() {
+        if (savedSnapshot != null) {
+            pendingDailyStart = true
+        } else {
+            onStartDaily()
+        }
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
@@ -71,7 +97,6 @@ fun HomeScreen(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    // Badges Button
                     Text(
                         text = "🏆",
                         fontSize = 15.sp,
@@ -85,7 +110,6 @@ fun HomeScreen(
                             .padding(horizontal = 8.dp, vertical = 6.dp)
                     )
 
-                    // Stats Button
                     Text(
                         text = "📊",
                         fontSize = 15.sp,
@@ -99,7 +123,6 @@ fun HomeScreen(
                             .padding(horizontal = 8.dp, vertical = 6.dp)
                     )
 
-                    // Settings Button
                     Text(
                         text = "⚙️",
                         fontSize = 15.sp,
@@ -173,7 +196,7 @@ fun HomeScreen(
                     .background(Color(0xFF24223A))
                     .clickable {
                         Haptics.click()
-                        onStartDaily()
+                        requestStartDaily()
                     }
                     .padding(18.dp)
             ) {
@@ -200,7 +223,7 @@ fun HomeScreen(
                     Button(
                         onClick = {
                             Haptics.click()
-                            onStartDaily()
+                            requestStartDaily()
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9333EA))
                     ) {
@@ -241,7 +264,7 @@ fun HomeScreen(
                             .background(SudokuColors.CardBackground)
                             .clickable {
                                 Haptics.click()
-                                onStartNewGame(diff)
+                                requestStartGame(diff)
                             }
                             .padding(horizontal = 18.dp, vertical = 12.dp)
                     ) {
@@ -257,6 +280,69 @@ fun HomeScreen(
                                 color = SudokuColors.TextGiven
                             )
                             Text("●", fontSize = 16.sp, color = color)
+                        }
+                    }
+                }
+            }
+        }
+
+        // Confirmation Dialog before overwriting an ongoing game
+        if (pendingDifficulty != null || pendingDailyStart) {
+            Dialog(onDismissRequest = {
+                pendingDifficulty = null
+                pendingDailyStart = false
+            }) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(SudokuColors.CardBackground)
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Text(text = "⚠️", fontSize = 38.sp)
+                    Text(
+                        text = "Start New Game?",
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    Text(
+                        text = "You have an ongoing ${savedSnapshot?.difficulty ?: ""} game in progress. Starting a new game will discard your current progress.",
+                        fontSize = 14.sp,
+                        color = Color(0xFF94A3B8),
+                        lineHeight = 18.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(6.dp))
+
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = {
+                                val diff = pendingDifficulty
+                                val isDaily = pendingDailyStart
+                                pendingDifficulty = null
+                                pendingDailyStart = false
+                                if (isDaily) onStartDaily() else if (diff != null) onStartNewGame(diff)
+                            },
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                        ) {
+                            Text("Discard & Start New", color = Color.White, fontWeight = FontWeight.Bold)
+                        }
+
+                        OutlinedButton(
+                            onClick = {
+                                pendingDifficulty = null
+                                pendingDailyStart = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("Cancel", color = Color(0xFFCBD5E1))
                         }
                     }
                 }

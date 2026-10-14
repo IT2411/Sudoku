@@ -3,6 +3,7 @@ package com.sudoku.ui.screens
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -10,6 +11,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -31,7 +33,8 @@ fun CompletionDialog(
     hintsUsed: Int,
     difficulty: Difficulty,
     newAchievements: List<Achievement> = emptyList(),
-    onNewGame: (Difficulty) -> Unit
+    onPlayAgain: () -> Unit,
+    onMainMenu: () -> Unit
 ) {
     Dialog(onDismissRequest = {}) {
         Column(
@@ -83,13 +86,27 @@ fun CompletionDialog(
             Text(text = "Mistakes: $mistakes", fontSize = 14.sp, color = SudokuColors.TextNote)
             Text(text = "Hints Used: $hintsUsed", fontSize = 14.sp, color = SudokuColors.TextNote)
 
-            Spacer(modifier = Modifier.height(12.dp))
-            Button(
-                onClick = { onNewGame(difficulty) },
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // Action Buttons
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Play Again (${difficulty.displayName})", color = Color.White)
+                Button(
+                    onClick = onPlayAgain,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2563EB))
+                ) {
+                    Text("Play Again (${difficulty.displayName})", color = Color.White)
+                }
+
+                OutlinedButton(
+                    onClick = onMainMenu,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("🏠 Main Menu", color = Color(0xFFCBD5E1))
+                }
             }
         }
     }
@@ -97,7 +114,9 @@ fun CompletionDialog(
 
 @Composable
 fun GameOverDialog(
-    onRetry: () -> Unit
+    difficulty: Difficulty,
+    onRetry: () -> Unit,
+    onMainMenu: () -> Unit
 ) {
     Dialog(onDismissRequest = {}) {
         Column(
@@ -123,12 +142,25 @@ fun GameOverDialog(
             )
 
             Spacer(modifier = Modifier.height(8.dp))
-            Button(
-                onClick = onRetry,
+
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Text("Try Again", color = Color.White)
+                Button(
+                    onClick = onRetry,
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFDC2626))
+                ) {
+                    Text("Try Again (${difficulty.displayName})", color = Color.White)
+                }
+
+                OutlinedButton(
+                    onClick = onMainMenu,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("🏠 Main Menu", color = Color(0xFFCBD5E1))
+                }
             }
         }
     }

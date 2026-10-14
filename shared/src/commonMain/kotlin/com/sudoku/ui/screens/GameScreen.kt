@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -65,12 +63,12 @@ fun GameScreen(
     val settings = remember { SettingsRepository.loadSettings() }
     val maxMistakesAllowed = if (settings.mistakeLimitEnabled) 3 else -1
 
-    var selectedDifficulty by remember { mutableStateOf(initialGame?.difficulty ?: Difficulty.EASY) }
+    val currentDifficulty = initialGame?.difficulty ?: Difficulty.EASY
     var game by remember {
         mutableStateOf(
             initialGame ?: SudokuGame(
-                puzzle = SudokuGenerator.generate(targetClues = selectedDifficulty.baseClueTarget),
-                difficulty = selectedDifficulty,
+                puzzle = SudokuGenerator.generate(targetClues = currentDifficulty.baseClueTarget),
+                difficulty = currentDifficulty,
                 maxMistakes = maxMistakesAllowed
             )
         )
@@ -80,12 +78,13 @@ fun GameScreen(
     var notesMode by remember { mutableStateOf(false) }
     var timerSeconds by remember { mutableLongStateOf(game.elapsedTimeSeconds) }
     var activeHint by remember { mutableStateOf<TechniqueStep?>(null) }
-    var difficultyMenuOpen by remember { mutableStateOf(false) }
     var animatingCells by remember { mutableStateOf<Set<CellPosition>>(emptySet()) }
     var newlyUnlockedAchievements by remember { mutableStateOf<List<Achievement>>(emptyList()) }
 
     fun autoSave() {
-        GameRepository.saveGame(GameStateSnapshot.fromGame(game))
+        if (game.status == GameStatus.PLAYING || game.status == GameStatus.PAUSED) {
+            GameRepository.saveGame(GameStateSnapshot.fromGame(game))
+        }
     }
 
     fun triggerCompletionAnimation(cells: Set<CellPosition>) {
@@ -99,14 +98,13 @@ fun GameScreen(
         }
     }
 
-    fun startNewGame(diff: Difficulty) {
-        selectedDifficulty = diff
+    fun restartCurrentDifficulty() {
         game = SudokuGame(
-            puzzle = SudokuGenerator.generate(targetClues = diff.baseClueTarget),
-            difficulty = diff,
+            puzzle = SudokuGenerator.generate(targetClues = currentDifficulty.baseClueTarget),
+            difficulty = currentDifficulty,
             maxMistakes = maxMistakesAllowed
         )
-        StatisticsRepository.recordGameStarted(diff)
+        StatisticsRepository.recordGameStarted(currentDifficulty)
         timerSeconds = 0L
         activeHint = null
         notesMode = false
@@ -129,7 +127,6 @@ fun GameScreen(
         if (game.status == GameStatus.COMPLETED) {
             Haptics.success()
             StatisticsRepository.recordGameWon(game.difficulty, timerSeconds)
-            // Evaluate achievements
             newlyUnlockedAchievements = AchievementRepository.evaluateGameWon(game, timerSeconds)
             GameRepository.clearGame()
         } else if (game.status == GameStatus.GAME_OVER) {
@@ -152,6 +149,7 @@ fun GameScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
+            // Header Bar: "← Back" button, Read-Only Difficulty, Timer, Mistakes
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -159,9 +157,10 @@ fun GameScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "🏠",
-                    fontSize = 20.sp,
+                // Back Button (Saves and returns to Home)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp),
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .clickable {
@@ -169,49 +168,33 @@ fun GameScreen(
                             autoSave()
                             onBackToHome()
                         }
-                        .padding(6.dp)
-                )
-
-                Box {
-                    Text(
-                        text = "${selectedDifficulty.displayName} ▼",
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFA5B4FC),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color(0xFF1E2235))
-                            .clickable {
-                                Haptics.click()
-                                difficultyMenuOpen = true
-                            }
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                    )
-                    DropdownMenu(
-                        expanded = difficultyMenuOpen,
-                        onDismissRequest = { difficultyMenuOpen = false }
-                    ) {
-                        Difficulty.entries.forEach { diff ->
-                            DropdownMenuItem(
-                                text = { Text(diff.displayName) },
-                                onClick = {
-                                    Haptics.click()
-                                    difficultyMenuOpen = false
-                                    startNewGame(diff)
-                                }
-                            )
-                        }
-                    }
+                        .padding(horizontal = 8.dp, vertical = 6.dp)
+                ) {
+                    Text("←", fontSize = 18.sp, color = Color(0xFF94A3B8), fontWeight = FontWeight.Bold)
+                    Text("Back", fontSize = 14.sp, color = Color(0xFFCBD5E1), fontWeight = FontWeight.Medium)
                 }
 
+                // Read-Only Difficulty Badge
+                Text(
+                    text = currentDifficulty.displayName,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFFA5B4FC),
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(Color(0xFF1E2235))
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                )
+
+                // Timer & Pause
                 if (settings.timerVisible) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Text(
                             text = formatSeconds(timerSeconds),
-                            fontSize = 16.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.SemiBold,
                             color = SudokuColors.TextPlayer
                         )
@@ -229,6 +212,7 @@ fun GameScreen(
                     }
                 }
 
+                // Mistakes Count
                 if (settings.mistakeLimitEnabled) {
                     Text(
                         text = "${game.mistakes}/3 ❌",
@@ -246,6 +230,7 @@ fun GameScreen(
                 }
             }
 
+            // Board View
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -299,6 +284,7 @@ fun GameScreen(
                 }
             }
 
+            // Hint Card
             activeHint?.let { hint ->
                 HintCard(
                     hint = hint,
@@ -317,6 +303,7 @@ fun GameScreen(
                 )
             }
 
+            // Toolbar: Undo, Redo, Hint
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -362,6 +349,7 @@ fun GameScreen(
                 }
             }
 
+            // Keypad
             NumberPad(
                 isNotesMode = notesMode,
                 completedDigits = game.completedDigits,
@@ -401,18 +389,28 @@ fun GameScreen(
             Spacer(modifier = Modifier.height(4.dp))
         }
 
+        // Completion Dialog
         if (game.status == GameStatus.COMPLETED) {
             CompletionDialog(
                 elapsedSeconds = timerSeconds,
                 mistakes = game.mistakes,
                 hintsUsed = game.hintsUsed,
-                difficulty = selectedDifficulty,
+                difficulty = currentDifficulty,
                 newAchievements = newlyUnlockedAchievements,
-                onNewGame = { diff -> startNewGame(diff) }
+                onPlayAgain = { restartCurrentDifficulty() },
+                onMainMenu = {
+                    Haptics.click()
+                    onBackToHome()
+                }
             )
         } else if (game.status == GameStatus.GAME_OVER) {
             GameOverDialog(
-                onRetry = { startNewGame(selectedDifficulty) }
+                difficulty = currentDifficulty,
+                onRetry = { restartCurrentDifficulty() },
+                onMainMenu = {
+                    Haptics.click()
+                    onBackToHome()
+                }
             )
         }
     }
