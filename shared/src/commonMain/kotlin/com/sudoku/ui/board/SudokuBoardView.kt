@@ -13,6 +13,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.unit.dp
+import com.sudoku.core.candidates.CandidateCalculator
 import com.sudoku.core.difficulty.TechniqueStep
 import com.sudoku.core.game.SudokuGame
 import com.sudoku.core.interaction.BoardSelectionEngine
@@ -54,10 +55,13 @@ fun SudokuBoardView(
                 ) {
                     for (c in 0 until CellPosition.GRID_SIZE) {
                         val pos = CellPosition.of(r, c)
+                        val blockedCandidates = CandidateCalculator.getBlockedCandidates(game.board, pos)
+
                         SudokuCellView(
                             position = pos,
                             value = game.board[pos],
                             notes = game.getNotes(pos),
+                            blockedNotes = blockedCandidates,
                             isGiven = game.puzzle.givenPositions.contains(pos),
                             highlight = highlights[pos.index],
                             isAnimatingUnitCompletion = animatingCells.contains(pos),

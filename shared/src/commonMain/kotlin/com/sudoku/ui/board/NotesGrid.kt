@@ -14,12 +14,10 @@ import androidx.compose.ui.unit.sp
 import com.sudoku.core.model.Candidates
 import com.sudoku.ui.theme.SudokuColors
 
-/**
- * 3x3 sub-grid displaying pencil marks 1 through 9.
- */
 @Composable
 fun NotesGrid(
     candidates: Candidates,
+    blockedCandidates: Candidates = Candidates.NONE,
     highlightDigit: Int?,
     modifier: Modifier = Modifier
 ) {
@@ -33,6 +31,7 @@ fun NotesGrid(
                 for (col in 0..2) {
                     val digit = row * 3 + col + 1
                     val hasDigit = candidates.contains(digit)
+                    val isBlocked = hasDigit && blockedCandidates.contains(digit)
                     val isHighlighted = hasDigit && digit == highlightDigit
 
                     Box(
@@ -42,11 +41,17 @@ fun NotesGrid(
                         contentAlignment = Alignment.Center
                     ) {
                         if (hasDigit) {
+                            val textColor = when {
+                                isBlocked -> SudokuColors.TextMistake // Option B: Red error note
+                                isHighlighted -> SudokuColors.NoteHighlighted
+                                else -> SudokuColors.TextNote
+                            }
+
                             Text(
                                 text = digit.toString(),
                                 fontSize = 10.sp,
-                                fontWeight = if (isHighlighted) FontWeight.Bold else FontWeight.Normal,
-                                color = if (isHighlighted) SudokuColors.NoteHighlighted else SudokuColors.TextNote
+                                fontWeight = if (isBlocked || isHighlighted) FontWeight.Bold else FontWeight.Normal,
+                                color = textColor
                             )
                         }
                     }

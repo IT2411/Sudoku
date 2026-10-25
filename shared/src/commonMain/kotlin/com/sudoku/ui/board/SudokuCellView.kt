@@ -31,6 +31,7 @@ fun SudokuCellView(
     position: CellPosition,
     value: Int,
     notes: Candidates,
+    blockedNotes: Candidates = Candidates.NONE,
     isGiven: Boolean,
     highlight: CellHighlightState,
     isAnimatingUnitCompletion: Boolean,
@@ -40,17 +41,14 @@ fun SudokuCellView(
 ) {
     val waveIntensity = remember { Animatable(0f) }
 
-    // Staggered wave animation sweeping from left to right based on cell column
     LaunchedEffect(isAnimatingUnitCompletion) {
         if (isAnimatingUnitCompletion) {
             val columnDelay = position.column * 55L
             delay(columnDelay)
-            // Gentle ease-in lift
             waveIntensity.animateTo(
                 targetValue = 1f,
                 animationSpec = tween(durationMillis = 320, easing = FastOutSlowInEasing)
             )
-            // Smooth ease-out descent
             waveIntensity.animateTo(
                 targetValue = 0f,
                 animationSpec = tween(durationMillis = 400, easing = LinearOutSlowInEasing)
@@ -70,7 +68,6 @@ fun SudokuCellView(
         else -> SudokuColors.Surface
     }
 
-    // Blend base color with the wave highlight
     val renderedBgColor = if (waveIntensity.value > 0f) {
         lerp(baseBgColor, SudokuColors.UnitCompletionWave, waveIntensity.value)
     } else {
@@ -104,6 +101,7 @@ fun SudokuCellView(
         } else if (notes.isNotEmpty) {
             NotesGrid(
                 candidates = notes,
+                blockedCandidates = blockedNotes,
                 highlightDigit = activeHighlightDigit
             )
         }

@@ -4,16 +4,8 @@ import com.sudoku.core.model.CellPosition
 import com.sudoku.core.model.Candidates
 import com.sudoku.core.model.SudokuBoard
 
-/**
- * Calculates candidate sets for cells on a Sudoku grid using bitwise operations.
- */
 object CandidateCalculator {
 
-    /**
-     * Calculates candidate digits for a specific cell.
-     *
-     * If the cell already contains a number (is not empty), returns [Candidates.NONE].
-     */
     fun getCandidates(board: SudokuBoard, position: CellPosition): Candidates {
         if (!board.isEmpty(position)) {
             return Candidates.NONE
@@ -30,9 +22,16 @@ object CandidateCalculator {
     }
 
     /**
-     * Computes candidate sets for all 81 cells on the board.
-     * Cells with assigned values will have [Candidates.NONE].
+     * Returns a Candidates bitmask of all digits currently placed in this cell's row, column, or 3x3 box.
+     * Any note matching a digit in this mask is an active contradiction.
      */
+    fun getBlockedCandidates(board: SudokuBoard, position: CellPosition): Candidates {
+        val rowMask = calculateRowUsedMask(board, position.row)
+        val colMask = calculateColumnUsedMask(board, position.column)
+        val boxMask = calculateBoxUsedMask(board, position.box)
+        return Candidates.fromMask(rowMask or colMask or boxMask)
+    }
+
     fun calculateAllCandidates(board: SudokuBoard): Array<Candidates> {
         val rowMasks = IntArray(CellPosition.GRID_SIZE) { r -> calculateRowUsedMask(board, r) }
         val colMasks = IntArray(CellPosition.GRID_SIZE) { c -> calculateColumnUsedMask(board, c) }
