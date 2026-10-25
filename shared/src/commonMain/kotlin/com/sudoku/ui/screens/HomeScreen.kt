@@ -30,6 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
+import com.sudoku.core.daily.DailyPuzzleEngine
 import com.sudoku.core.difficulty.Difficulty
 import com.sudoku.core.haptics.Haptics
 import com.sudoku.core.storage.GameStateSnapshot
@@ -42,11 +43,12 @@ fun HomeScreen(
     onStartDaily: () -> Unit,
     onOpenStats: () -> Unit,
     onOpenBadges: () -> Unit,
+    onOpenTips: () -> Unit,
     onOpenSettings: () -> Unit,
     onStartNewGame: (Difficulty) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    // Tracks pending game start if confirmation is needed
+    val isDailyDone = remember { DailyPuzzleEngine.isTodayCompleted() }
     var pendingDifficulty by remember { mutableStateOf<Difficulty?>(null) }
     var pendingDailyStart by remember { mutableStateOf(false) }
 
@@ -59,6 +61,7 @@ fun HomeScreen(
     }
 
     fun requestStartDaily() {
+        if (isDailyDone) return
         if (savedSnapshot != null) {
             pendingDailyStart = true
         } else {
@@ -97,6 +100,19 @@ fun HomeScreen(
                 }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Text(
+                        text = "📖",
+                        fontSize = 15.sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFF1E2235))
+                            .clickable {
+                                Haptics.click()
+                                onOpenTips()
+                            }
+                            .padding(horizontal = 8.dp, vertical = 6.dp)
+                    )
+
                     Text(
                         text = "🏆",
                         fontSize = 15.sp,
@@ -189,12 +205,13 @@ fun HomeScreen(
             }
 
             // Daily Challenge Card
+            val dailyBg = if (isDailyDone) Color(0xFF1A1A24) else Color(0xFF24223A)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(14.dp))
-                    .background(Color(0xFF24223A))
-                    .clickable {
+                    .background(dailyBg)
+                    .clickable(enabled = !isDailyDone) {
                         Haptics.click()
                         requestStartDaily()
                     }
@@ -207,14 +224,14 @@ fun HomeScreen(
                 ) {
                     Column {
                         Text(
-                            text = "📅 Daily Challenge",
+                            text = if (isDailyDone) "📅 Daily Challenge ✓" else "📅 Daily Challenge",
                             fontSize = 16.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFFC084FC)
+                            color = if (isDailyDone) Color(0xFF34D399) else Color(0xFFC084FC)
                         )
                         Spacer(modifier = Modifier.height(2.dp))
                         Text(
-                            text = "Worldwide seed for today",
+                            text = if (isDailyDone) "Completed for today! Come back tomorrow" else "Worldwide seed for today",
                             fontSize = 12.sp,
                             color = Color(0xFF94A3B8)
                         )
@@ -225,9 +242,14 @@ fun HomeScreen(
                             Haptics.click()
                             requestStartDaily()
                         },
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF9333EA))
+                        enabled = !isDailyDone,
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = Color(0xFF9333EA),
+                            disabledContainerColor = Color(0xFF2E2B3D),
+                            disabledContentColor = Color(0xFF6B7280)
+                        )
                     ) {
-                        Text("Play", color = Color.White)
+                        Text(if (isDailyDone) "Done ✓" else "Play", color = if (isDailyDone) Color(0xFF9CA3AF) else Color.White)
                     }
                 }
             }
@@ -286,7 +308,7 @@ fun HomeScreen(
             }
         }
 
-        // Confirmation Dialog before overwriting an ongoing game
+        // Confirmation Dialog
         if (pendingDifficulty != null || pendingDailyStart) {
             Dialog(onDismissRequest = {
                 pendingDifficulty = null

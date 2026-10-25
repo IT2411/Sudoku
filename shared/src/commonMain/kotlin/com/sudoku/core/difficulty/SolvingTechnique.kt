@@ -8,15 +8,11 @@ sealed interface SolvingTechnique {
     val name: String
     val weight: Int
 
-    /**
-     * Attempts to find the first applicable step using this technique.
-     * Returns null if no deduction can be made.
-     */
     fun findStep(board: SudokuBoard, candidates: Array<Candidates>): TechniqueStep?
 
     // -------------------------------------------------------------
     // 1. NAKED SINGLE
-    // A cell has only one legal candidate left.
+    // Explains exactly which digits in the Row, Col, and Box block this cell.
     // -------------------------------------------------------------
     data object NakedSingle : SolvingTechnique {
         override val name: String = "Naked Single"
@@ -29,11 +25,45 @@ sealed interface SolvingTechnique {
                     val single = cand.singleOrNull()
                     if (single != null) {
                         val pos = CellPosition.fromIndex(index)
+
+                        // 1. Digits present in this Row
+                        val rowDigits = (0..8)
+                            .mapNotNull { c -> if (c != pos.column && board[pos.row, c] != 0) board[pos.row, c] else null }
+                            .distinct().sorted()
+
+                        // 2. Digits present in this Column
+                        val colDigits = (0..8)
+                            .mapNotNull { r -> if (r != pos.row && board[r, pos.column] != 0) board[r, pos.column] else null }
+                            .distinct().sorted()
+
+                        // 3. Digits present in this 3x3 Box
+                        val boxDigits = getUnitPositions(2, pos.box)
+                            .mapNotNull { p -> if (p != pos && board[p] != 0) board[p] else null }
+                            .distinct().sorted()
+
+                        val allBlocked = (rowDigits + colDigits + boxDigits).distinct().sorted()
+
+                        val explanation = buildString {
+                            append("Cell (Row ${pos.row + 1}, Col ${pos.column + 1}) must be $single.\n\n")
+                            append("Why? All other digits 1–9 are ruled out:\n")
+                            if (rowDigits.isNotEmpty()) {
+                                append("• Row ${pos.row + 1} has: ${rowDigits.joinToString(", ")}\n")
+                            }
+                            if (colDigits.isNotEmpty()) {
+                                append("• Column ${pos.column + 1} has: ${colDigits.joinToString(", ")}\n")
+                            }
+                            if (boxDigits.isNotEmpty()) {
+                                append("• Box ${pos.box + 1} has: ${boxDigits.joinToString(", ")}\n")
+                            }
+                            append("\nTogether, these block: ${allBlocked.joinToString(", ")}.\n")
+                            append("The only remaining number is $single.")
+                        }
+
                         return TechniqueStep(
                             technique = this,
                             primaryCells = setOf(pos),
                             placedDigit = pos to single,
-                            explanation = "Cell (R${pos.row + 1}, C${pos.column + 1}) can only be $single as all other digits are blocked."
+                            explanation = explanation
                         )
                     }
                 }
@@ -44,14 +74,13 @@ sealed interface SolvingTechnique {
 
     // -------------------------------------------------------------
     // 2. HIDDEN SINGLE
-    // A digit appears in only one empty cell within a row, col, or box.
+    // Explains why every other empty cell in this unit cannot contain the digit.
     // -------------------------------------------------------------
     data object HiddenSingle : SolvingTechnique {
         override val name: String = "Hidden Single"
         override val weight: Int = 2
 
         override fun findStep(board: SudokuBoard, candidates: Array<Candidates>): TechniqueStep? {
-            // Check Rows, Columns, Boxes
             for (unitType in 0..2) {
                 for (unitIndex in 0..8) {
                     val step = checkUnit(board, candidates, unitType, unitIndex)
@@ -72,26 +101,57 @@ sealed interface SolvingTechnique {
             for (digit in 1..9) {
                 var count = 0
                 var targetPos: CellPosition? = null
+                val blockedReasons = mutableListOf<String>()
 
                 for (pos in positions) {
-                    if (board[pos] == SudokuBoard.EMPTY_VALUE && candidates[pos.index].contains(digit)) {
-                        count++
-                        targetPos = pos
-                        if (count > 1) break
+                    if (board[pos] == SudokuBoard.EMPTY_VALUE) {
+                        if (candidates[pos.index].contains(digit)) {
+                            count++
+                            targetPos = pos
+                        } else {
+                            // Find why this other empty cell cannot contain 'digit'
+                            val reason = when (unitType) {
+                                0 -> { // Row unit: check col and box
+                                    val inCol = (0..8).any { r -> board[r, pos.column] == digit }
+                                    if (inCol) "Col ${pos.column + 1} already has $digit"
+                                    else "Box ${pos.box + 1} already has $digit"
+                                }
+                                1 -> { // Column unit: check row and box
+                                    val inRow = (0..8).any { c -> board[pos.row, c] == digit }
+                                    if (inRow) "Row ${pos.row + 1} already has $digit"
+                                    else "Box ${pos.box + 1} already has $digit"
+                                }
+                                else -> { // Box unit: check row and col
+                                    val inRow = (0..8).any { c -> board[pos.row, c] == digit }
+                                    if (inRow) "Row ${pos.row + 1} already has $digit"
+                                    else "Col ${pos.column + 1} already has $digit"
+                                }
+                            }
+                            blockedReasons.add("• (R${pos.row + 1}, C${pos.column + 1}): $reason")
+                        }
                     }
                 }
 
                 if (count == 1 && targetPos != null) {
                     val unitName = when (unitType) {
-                        0 -> "row ${unitIndex + 1}"
-                        1 -> "column ${unitIndex + 1}"
-                        else -> "box ${unitIndex + 1}"
+                        0 -> "Row ${unitIndex + 1}"
+                        1 -> "Column ${unitIndex + 1}"
+                        else -> "Box ${unitIndex + 1}"
                     }
+
+                    val explanation = buildString {
+                        append("Digit $digit must go in (Row ${targetPos.row + 1}, Col ${targetPos.column + 1}).\n\n")
+                        append("Why? In $unitName, every other cell is blocked from having $digit:\n")
+                        blockedReasons.take(3).forEach { append("$it\n") }
+                        if (blockedReasons.size > 3) append("• Other cells also blocked\n")
+                        append("\nTherefore, (R${targetPos.row + 1}, C${targetPos.column + 1}) is the only legal spot left in $unitName.")
+                    }
+
                     return TechniqueStep(
                         technique = this,
                         primaryCells = setOf(targetPos),
                         placedDigit = targetPos to digit,
-                        explanation = "$digit can only be placed here in $unitName."
+                        explanation = explanation
                     )
                 }
             }
@@ -101,7 +161,6 @@ sealed interface SolvingTechnique {
 
     // -------------------------------------------------------------
     // 3. NAKED PAIR
-    // Two cells in the same unit share the exact same 2 candidates.
     // -------------------------------------------------------------
     data object NakedPair : SolvingTechnique {
         override val name: String = "Naked Pair"
@@ -121,7 +180,6 @@ sealed interface SolvingTechnique {
                             val cand2 = candidates[c2.index]
 
                             if (cand1.mask == cand2.mask) {
-                                // Found pair! Check if other cells in this unit contain these digits
                                 val eliminations = mutableMapOf<CellPosition, Candidates>()
                                 val pairDigits = cand1.toList()
 
@@ -141,12 +199,25 @@ sealed interface SolvingTechnique {
                                 }
 
                                 if (eliminations.isNotEmpty()) {
+                                    val unitName = when (unitType) {
+                                        0 -> "Row ${unitIndex + 1}"
+                                        1 -> "Column ${unitIndex + 1}"
+                                        else -> "Box ${unitIndex + 1}"
+                                    }
+
+                                    val explanation = buildString {
+                                        append("Naked Pair: Digits {${pairDigits.joinToString(", ")}}.\n\n")
+                                        append("Cells (R${c1.row + 1}, C${c1.column + 1}) and (R${c2.row + 1}, C${c2.column + 1}) only contain these two digits.\n")
+                                        append("Because they must share {${pairDigits.joinToString(", ")}}, no other cell in $unitName can have them.\n")
+                                        append("We eliminate {${pairDigits.joinToString(", ")}} from ${eliminations.size} other cell(s).")
+                                    }
+
                                     return TechniqueStep(
                                         technique = this,
                                         primaryCells = setOf(c1, c2),
                                         secondaryCells = eliminations.keys,
                                         eliminatedCandidates = eliminations,
-                                        explanation = "Cells form a Naked Pair with digits ${pairDigits.joinToString(",")}. These digits are eliminated from other cells in this unit."
+                                        explanation = explanation
                                     )
                                 }
                             }
@@ -160,7 +231,6 @@ sealed interface SolvingTechnique {
 
     // -------------------------------------------------------------
     // 4. POINTING PAIR / TRIPLE
-    // All candidates for a digit within a box lie in the same row/col.
     // -------------------------------------------------------------
     data object PointingPair : SolvingTechnique {
         override val name: String = "Pointing Pair/Triple"
@@ -188,12 +258,19 @@ sealed interface SolvingTechnique {
                             }
 
                             if (eliminations.isNotEmpty()) {
+                                val explanation = buildString {
+                                    append("Pointing Pair: Digit $digit in Box ${box + 1}.\n\n")
+                                    append("In Box ${box + 1}, candidate $digit only appears inside Row ${row + 1}.\n")
+                                    append("Since $digit must be in this box along Row ${row + 1}, it cannot exist anywhere else in Row ${row + 1}.\n")
+                                    append("Eliminating $digit from ${eliminations.size} other cell(s) in Row ${row + 1}.")
+                                }
+
                                 return TechniqueStep(
                                     technique = this,
                                     primaryCells = cellsWithDigit.toSet(),
                                     secondaryCells = eliminations.keys,
                                     eliminatedCandidates = eliminations,
-                                    explanation = "Digit $digit in Box ${box + 1} is locked into Row ${row + 1}, eliminating it from the rest of the row."
+                                    explanation = explanation
                                 )
                             }
                         }
@@ -210,12 +287,19 @@ sealed interface SolvingTechnique {
                             }
 
                             if (eliminations.isNotEmpty()) {
+                                val explanation = buildString {
+                                    append("Pointing Pair: Digit $digit in Box ${box + 1}.\n\n")
+                                    append("In Box ${box + 1}, candidate $digit only appears inside Column ${col + 1}.\n")
+                                    append("Since $digit must be in this box along Column ${col + 1}, it cannot exist anywhere else in Column ${col + 1}.\n")
+                                    append("Eliminating $digit from ${eliminations.size} other cell(s) in Column ${col + 1}.")
+                                }
+
                                 return TechniqueStep(
                                     technique = this,
                                     primaryCells = cellsWithDigit.toSet(),
                                     secondaryCells = eliminations.keys,
                                     eliminatedCandidates = eliminations,
-                                    explanation = "Digit $digit in Box ${box + 1} is locked into Column ${col + 1}, eliminating it from the rest of the column."
+                                    explanation = explanation
                                 )
                             }
                         }
@@ -228,14 +312,12 @@ sealed interface SolvingTechnique {
 
     // -------------------------------------------------------------
     // 5. X-WING
-    // A digit appears in exactly 2 cells across 2 rows/cols, forming a rectangle.
     // -------------------------------------------------------------
     data object XWing : SolvingTechnique {
         override val name: String = "X-Wing"
         override val weight: Int = 10
 
         override fun findStep(board: SudokuBoard, candidates: Array<Candidates>): TechniqueStep? {
-            // Row-based X-Wing
             for (digit in 1..9) {
                 val rowPairs = mutableListOf<Pair<Int, List<CellPosition>>>()
 
@@ -256,7 +338,6 @@ sealed interface SolvingTechnique {
                             val c2 = cells1[1].column
 
                             if (cells2[0].column == c1 && cells2[1].column == c2) {
-                                // Found row X-Wing on columns c1 and c2!
                                 val eliminations = mutableMapOf<CellPosition, Candidates>()
 
                                 for (r in 0..8) {
@@ -273,12 +354,18 @@ sealed interface SolvingTechnique {
                                 }
 
                                 if (eliminations.isNotEmpty()) {
+                                    val explanation = buildString {
+                                        append("X-Wing: Digit $digit forms a rectangle across Rows ${r1 + 1} and ${r2 + 1}.\n\n")
+                                        append("Because $digit is locked into Columns ${c1 + 1} and ${c2 + 1} for both rows, no other cells in these columns can contain $digit.\n")
+                                        append("Eliminating $digit from ${eliminations.size} other cell(s).")
+                                    }
+
                                     return TechniqueStep(
                                         technique = this,
                                         primaryCells = (cells1 + cells2).toSet(),
                                         secondaryCells = eliminations.keys,
                                         eliminatedCandidates = eliminations,
-                                        explanation = "X-Wing found for digit $digit in rows ${r1 + 1} and ${r2 + 1}, eliminating $digit from other cells in columns ${c1 + 1} and ${c2 + 1}."
+                                        explanation = explanation
                                     )
                                 }
                             }
@@ -292,9 +379,9 @@ sealed interface SolvingTechnique {
 
     companion object {
         fun getUnitPositions(unitType: Int, unitIndex: Int): List<CellPosition> = when (unitType) {
-            0 -> (0..8).map { CellPosition.of(unitIndex, it) } // Row
-            1 -> (0..8).map { CellPosition.of(it, unitIndex) } // Column
-            else -> {                                           // Box
+            0 -> (0..8).map { CellPosition.of(unitIndex, it) }
+            1 -> (0..8).map { CellPosition.of(it, unitIndex) }
+            else -> {
                 val startR = (unitIndex / 3) * 3
                 val startC = (unitIndex % 3) * 3
                 buildList {

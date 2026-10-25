@@ -2,11 +2,17 @@ package com.sudoku.ui.controls
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.OutlinedButton
@@ -32,11 +38,12 @@ fun HintCard(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(12.dp))
+            .clip(RoundedCornerShape(14.dp))
             .background(SudokuColors.CardBackground)
             .padding(14.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
+        // Header
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -56,13 +63,24 @@ fun HintCard(
             }
         }
 
-        Text(
-            text = hint.explanation,
-            fontSize = 13.sp,
-            color = Color(0xFFCBD5E1),
-            lineHeight = 17.sp
-        )
+        // Scrollable Detailed Explanation
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .heightIn(max = 160.dp)
+                .verticalScroll(rememberScrollState())
+        ) {
+            Text(
+                text = hint.explanation,
+                fontSize = 13.sp,
+                color = Color(0xFFE2E8F0),
+                lineHeight = 18.sp
+            )
+        }
 
+        Spacer(modifier = Modifier.height(2.dp))
+
+        // Action Button
         Button(
             onClick = onApply,
             modifier = Modifier.align(Alignment.End),

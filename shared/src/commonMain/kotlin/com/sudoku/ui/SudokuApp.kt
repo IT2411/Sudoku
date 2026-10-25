@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import com.sudoku.core.daily.DailyPuzzleEngine
 import com.sudoku.core.difficulty.Difficulty
+import com.sudoku.core.difficulty.SolvingTechnique
 import com.sudoku.core.game.GameStatus
 import com.sudoku.core.game.SudokuGame
 import com.sudoku.core.generator.SudokuGenerator
@@ -21,13 +22,17 @@ import com.sudoku.ui.screens.GameScreen
 import com.sudoku.ui.screens.HomeScreen
 import com.sudoku.ui.screens.SettingsScreen
 import com.sudoku.ui.screens.StatisticsScreen
+import com.sudoku.ui.screens.StrategyDemoScreen
+import com.sudoku.ui.screens.TipsScreen
 
 sealed interface AppScreen {
     data object Home : AppScreen
     data object Statistics : AppScreen
     data object Badges : AppScreen
+    data object Tips : AppScreen
+    data class StrategyDemo(val technique: SolvingTechnique) : AppScreen
     data object Settings : AppScreen
-    data class Game(val activeGame: SudokuGame) : AppScreen
+    data class Game(val activeGame: SudokuGame, val isDaily: Boolean = false) : AppScreen
 }
 
 class NavigationController {
@@ -41,17 +46,24 @@ fun SudokuApp(
 ) {
     var currentScreen by remember { mutableStateOf<AppScreen>(AppScreen.Home) }
 
-    // Synchronize navigation state with the system back button
     LaunchedEffect(currentScreen) {
         navController.canGoBack = currentScreen != AppScreen.Home
         navController.onGoBack = {
-            if (currentScreen is AppScreen.Game) {
-                val game = (currentScreen as AppScreen.Game).activeGame
-                if (game.status == GameStatus.PLAYING || game.status == GameStatus.PAUSED) {
-                    GameRepository.saveGame(GameStateSnapshot.fromGame(game))
+            when (currentScreen) {
+                is AppScreen.StrategyDemo -> {
+                    currentScreen = AppScreen.Tips
+                }
+                is AppScreen.Game -> {
+                    val game = (currentScreen as AppScreen.Game).activeGame
+                    if (game.status == GameStatus.PLAYING || game.status == GameStatus.PAUSED) {
+                        GameRepository.saveGame(GameStateSnapshot.fromGame(game))
+                    }
+                    currentScreen = AppScreen.Home
+                }
+                else -> {
+                    currentScreen = AppScreen.Home
                 }
             }
-            currentScreen = AppScreen.Home
         }
     }
 
@@ -66,27 +78,24 @@ fun SudokuApp(
                     }
                 },
                 onStartDaily = {
-                    val puzzle = DailyPuzzleEngine.generateDaily()
-                    val dailyGame = SudokuGame(puzzle = puzzle, difficulty = Difficulty.MEDIUM)
-                    StatisticsRepository.recordGameStarted(Difficulty.MEDIUM)
-                    currentScreen = AppScreen.Game(dailyGame)
+                    if (!DailyPuzzleEngine.isTodayCompleted()) {
+                        val puzzle = DailyPuzzleEngine.generateDaily()
+                        val dailyGame = SudokuGame(puzzle = puzzle, difficulty = Difficulty.MEDIUM)
+                        StatisticsRepository.recordGameStarted(Difficulty.MEDIUM)
+                        currentScreen = AppScreen.Game(dailyGame, isDaily = true)
+                    }
                 },
-                onOpenStats = {
-                    currentScreen = AppScreen.Statistics
-                },
-                onOpenBadges = {
-                    currentScreen = AppScreen.Badges
-                },
-                onOpenSettings = {
-                    currentScreen = AppScreen.Settings
-                },
+                onOpenStats = { currentScreen = AppScreen.Statistics },
+                onOpenBadges = { currentScreen = AppScreen.Badges },
+                onOpenTips = { currentScreen = AppScreen.Tips },
+                onOpenSettings = { currentScreen = AppScreen.Settings },
                 onStartNewGame = { diff ->
                     val newGame = SudokuGame(
                         puzzle = SudokuGenerator.generate(targetClues = diff.baseClueTarget),
                         difficulty = diff
                     )
                     StatisticsRepository.recordGameStarted(diff)
-                    currentScreen = AppScreen.Game(newGame)
+                    currentScreen = AppScreen.Game(newGame, isDaily = false)
                 }
             )
         }
@@ -102,6 +111,18 @@ fun SudokuApp(
                 onBack = { currentScreen = AppScreen.Home }
             )
         }
+        is AppScreen.Tips -> {
+            TipsScreen(
+                onBack = { currentScreen = AppScreen.Home },
+                onOpenDemo = { tech -> currentScreen = AppScreen.StrategyDemo(tech) }
+            )
+        }
+        is AppScreen.StrategyDemo -> {
+            StrategyDemoScreen(
+                technique = screen.technique,
+                onBack = { currentScreen = AppScreen.Tips }
+            )
+        }
         is AppScreen.Settings -> {
             SettingsScreen(
                 onBack = { currentScreen = AppScreen.Home }
@@ -110,6 +131,7 @@ fun SudokuApp(
         is AppScreen.Game -> {
             GameScreen(
                 initialGame = screen.activeGame,
+                isDaily = screen.isDaily,
                 onBackToHome = { currentScreen = AppScreen.Home }
             )
         }

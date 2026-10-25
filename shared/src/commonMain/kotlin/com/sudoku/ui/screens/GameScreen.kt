@@ -34,6 +34,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.sudoku.core.achievements.Achievement
+import com.sudoku.core.daily.DailyPuzzleEngine
 import com.sudoku.core.difficulty.Difficulty
 import com.sudoku.core.difficulty.TechniqueStep
 import com.sudoku.core.game.GameStatus
@@ -56,6 +57,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun GameScreen(
     initialGame: SudokuGame? = null,
+    isDaily: Boolean = false,
     onBackToHome: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -126,11 +128,15 @@ fun GameScreen(
     LaunchedEffect(game.status) {
         if (game.status == GameStatus.COMPLETED) {
             Haptics.success()
+            if (isDaily) {
+                DailyPuzzleEngine.markTodayCompleted()
+            }
             StatisticsRepository.recordGameWon(game.difficulty, timerSeconds)
             newlyUnlockedAchievements = AchievementRepository.evaluateGameWon(game, timerSeconds)
             GameRepository.clearGame()
         } else if (game.status == GameStatus.GAME_OVER) {
             Haptics.error()
+            StatisticsRepository.recordGameOver()
             GameRepository.clearGame()
         }
     }
@@ -149,7 +155,7 @@ fun GameScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Header Bar: "← Back" button, Read-Only Difficulty, Timer, Mistakes
+            // Header Bar
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -157,7 +163,6 @@ fun GameScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                // Back Button (Saves and returns to Home)
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
@@ -174,19 +179,17 @@ fun GameScreen(
                     Text("Back", fontSize = 14.sp, color = Color(0xFFCBD5E1), fontWeight = FontWeight.Medium)
                 }
 
-                // Read-Only Difficulty Badge
                 Text(
-                    text = currentDifficulty.displayName,
+                    text = if (isDaily) "📅 Daily Challenge" else currentDifficulty.displayName,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFFA5B4FC),
+                    color = if (isDaily) Color(0xFFC084FC) else Color(0xFFA5B4FC),
                     modifier = Modifier
                         .clip(RoundedCornerShape(8.dp))
                         .background(Color(0xFF1E2235))
                         .padding(horizontal = 12.dp, vertical = 6.dp)
                 )
 
-                // Timer & Pause
                 if (settings.timerVisible) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -212,7 +215,6 @@ fun GameScreen(
                     }
                 }
 
-                // Mistakes Count
                 if (settings.mistakeLimitEnabled) {
                     Text(
                         text = "${game.mistakes}/3 ❌",
@@ -303,7 +305,7 @@ fun GameScreen(
                 )
             }
 
-            // Toolbar: Undo, Redo, Hint
+            // Toolbar
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceEvenly
@@ -397,7 +399,9 @@ fun GameScreen(
                 hintsUsed = game.hintsUsed,
                 difficulty = currentDifficulty,
                 newAchievements = newlyUnlockedAchievements,
-                onPlayAgain = { restartCurrentDifficulty() },
+                onPlayAgain = {
+                    if (!isDaily) restartCurrentDifficulty() else onBackToHome()
+                },
                 onMainMenu = {
                     Haptics.click()
                     onBackToHome()

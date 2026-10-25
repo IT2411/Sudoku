@@ -1,6 +1,7 @@
 package com.sudoku.core.statistics
 
 import com.sudoku.core.difficulty.Difficulty
+import kotlin.math.max
 
 data class DifficultyStats(
     val gamesPlayed: Int = 0,
@@ -37,6 +38,13 @@ data class PlayerStatistics(
     val winRatePercentage: Int
         get() = if (totalGamesPlayed > 0) (totalGamesWon * 100) / totalGamesPlayed else 0
 
+    fun withGameStarted(difficulty: Difficulty): PlayerStatistics {
+        val current = statsByDifficulty[difficulty] ?: DifficultyStats()
+        return copy(
+            statsByDifficulty = statsByDifficulty + (difficulty to current.copy(gamesPlayed = current.gamesPlayed + 1))
+        )
+    }
+
     fun withGameWon(difficulty: Difficulty, timeSeconds: Long): PlayerStatistics {
         val current = statsByDifficulty[difficulty] ?: DifficultyStats()
         val newBest = if (current.bestTimeSeconds == 0L || timeSeconds < current.bestTimeSeconds) {
@@ -45,22 +53,25 @@ data class PlayerStatistics(
             current.bestTimeSeconds
         }
 
+        // Only increment gamesWon; gamesPlayed was already accounted for on start
         val updated = current.copy(
-            gamesPlayed = current.gamesPlayed + 1,
             gamesWon = current.gamesWon + 1,
+            gamesPlayed = max(current.gamesPlayed, current.gamesWon + 1),
             bestTimeSeconds = newBest,
             totalTimeSeconds = current.totalTimeSeconds + timeSeconds
         )
 
+        val newStreak = currentStreak + 1
+        val newBestStreak = max(bestStreak, newStreak)
+
         return copy(
+            currentStreak = newStreak,
+            bestStreak = newBestStreak,
             statsByDifficulty = statsByDifficulty + (difficulty to updated)
         )
     }
 
-    fun withGameStarted(difficulty: Difficulty): PlayerStatistics {
-        val current = statsByDifficulty[difficulty] ?: DifficultyStats()
-        return copy(
-            statsByDifficulty = statsByDifficulty + (difficulty to current.copy(gamesPlayed = current.gamesPlayed + 1))
-        )
+    fun withGameOver(): PlayerStatistics {
+        return copy(currentStreak = 0)
     }
 }
